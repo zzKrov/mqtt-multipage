@@ -17,37 +17,8 @@ if "pulso_boot" not in st.session_state:
         "analog": st.session_state.get("pulse_analog", 50.0),
     }
 
-eq["header"]("PULSO", "Acción directa y ajuste gradual de intensidad.")
-
-st.html(
-    """
-    <div class="eq-steps">
-      <div class="eq-step">
-        <svg class="eq-step-icon" viewBox="0 0 34 34" fill="none">
-          <rect x="6" y="13" width="22" height="8" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1"/>
-          <rect x="8" y="15" width="8" height="4" fill="#ffffff" class="eq-anim-toggle"/>
-        </svg>
-        <div><span class="eq-step-num">01</span><span class="eq-step-text">Pulso binario</span></div>
-      </div>
-
-      <div class="eq-step">
-        <svg class="eq-step-icon" viewBox="0 0 34 34" fill="none">
-          <line x1="6" y1="17" x2="28" y2="17" stroke="#ffffff" stroke-width="1.3" class="eq-anim-beam"/>
-          <circle cx="17" cy="17" r="2.2" fill="#ffffff"/>
-        </svg>
-        <div><span class="eq-step-num">02</span><span class="eq-step-text">Escala continua</span></div>
-      </div>
-
-      <div class="eq-step">
-        <svg class="eq-step-icon" viewBox="0 0 34 34" fill="none">
-          <circle cx="17" cy="17" r="11" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1"/>
-          <path d="M12 17.5L15.5 21L22.5 13.5" stroke="#ffffff" stroke-width="1.5"/>
-        </svg>
-        <div><span class="eq-step-num">03</span><span class="eq-step-text">Confirmación</span></div>
-      </div>
-    </div>
-    """
-)
+st.subheader("PULSO")
+st.caption("Estado binario y nivel.")
 
 res = eq["pulse_console"](
     key="eq_pulse_widget",
@@ -68,29 +39,17 @@ if getattr(res, "command", None):
             ok, ms = channel.publish(TOPIC_SWITCH, json.dumps({"Act1": val}))
             etiqueta = "Encendido" if val == "ON" else "Apagado"
             st.session_state["last_pulse_status"] = (
-                f"{hora} · {etiqueta} · {ms:.0f} ms" if ok else f"{hora} · Sin respuesta ({etiqueta})"
+                f"{hora} · {etiqueta} · {ms:.0f} ms" if ok else f"{hora} · Sin respuesta"
             )
-            st.session_state["last_pulse_ok"] = ok
 
         elif kind == "analog":
             num = float(val)
             st.session_state["pulse_analog"] = num
             ok, ms = channel.publish(TOPIC_ANALOG, json.dumps({"Analog": num}))
             st.session_state["last_pulse_status"] = (
-                f"{hora} · Nivel {num:.1f} · {ms:.0f} ms" if ok else f"{hora} · Sin respuesta (Nivel {num:.1f})"
+                f"{hora} · Nivel {num:.1f} · {ms:.0f} ms" if ok else f"{hora} · Sin respuesta"
             )
-            st.session_state["last_pulse_ok"] = ok
 
         st.session_state["last_pulse_cmd_id"] = cid
 
-status_msg = st.session_state.get("last_pulse_status", "Sistema listo.")
-dot_cls = "eq-dot" if st.session_state.get("last_pulse_ok", True) else "eq-dot eq-dot-dim"
-
-st.html(
-    f"""
-    <div class="eq-status-strip">
-      <span><span class="{dot_cls}"></span>{status_msg}</span>
-      <span style="color:#7c7c85;">PULSO</span>
-    </div>
-    """
-)
+st.caption(f"● {st.session_state.get('last_pulse_status', 'Listo.')}")
