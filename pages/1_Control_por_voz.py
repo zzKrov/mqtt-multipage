@@ -3,6 +3,9 @@ from datetime import datetime
 
 import streamlit as st
 
+if "_eq" not in st.session_state:
+    st.switch_page("Inicio.py")
+
 VOICE_HOST = "broker.mqttdashboard.com"
 VOICE_PORT = 1883
 VOICE_TOPIC = "voice_ctrl"
