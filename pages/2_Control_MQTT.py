@@ -3,6 +3,9 @@ from datetime import datetime
 
 import streamlit as st
 
+if "_eq" not in st.session_state:
+    st.switch_page("Inicio.py")
+
 PULSE_HOST = "157.230.214.127"
 PULSE_PORT = 1883
 TOPIC_SWITCH = "cmqtt_s"
