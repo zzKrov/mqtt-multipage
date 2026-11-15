@@ -1,9 +1,14 @@
+import re
 import threading
 import time
 import uuid
 
 import paho.mqtt.client as mqtt
 import streamlit as st
+import streamlit.components.v1 as components
+
+# Opcional: pega aquí el enlace de tu proyecto Wokwi para cargarlo por defecto
+DEFAULT_WOKWI_URL = ""
 
 st.set_page_config(
     page_title="CONTROL",
@@ -159,7 +164,7 @@ def get_components():
         :host { display: block; width: 100%; }
         .wrap { display: flex; flex-direction: column; gap: 12px; font-family: 'Space Grotesk', system-ui, sans-serif; }
         .hero {
-          position: relative; width: 100%; height: 250px;
+          position: relative; width: 100%; height: 240px;
           background: #0b0b0d; border: 1px solid #26262b; overflow: hidden; user-select: none;
         }
         #eq-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -167,7 +172,7 @@ def get_components():
           position: relative; z-index: 2; height: 100%;
           display: flex; align-items: center; justify-content: center; pointer-events: none;
         }
-        .emblem { width: 152px; height: 152px; }
+        .emblem { width: 148px; height: 148px; }
         .rot-cw { transform-origin: 90px 90px; animation: spinCW 32s linear infinite; }
         .rot-ccw { transform-origin: 90px 90px; animation: spinCCW 22s linear infinite; }
         .core-pulse { transform-origin: 90px 90px; animation: pulseCore 3.2s ease-in-out infinite; }
@@ -333,7 +338,7 @@ def get_components():
         .b3 { transform-origin: center; animation: barW 1.1s ease-in-out 0.4s infinite; }
         .arr { animation: arrS 1.8s ease-in-out infinite; }
         .eq-voice-shell {
-          position: relative; width: 100%; min-height: 310px; background: #0b0b0d;
+          position: relative; width: 100%; min-height: 300px; background: #0b0b0d;
           border: 1px solid #26262b; overflow: hidden; display: flex; flex-direction: column;
           justify-content: space-between; padding: 16px 18px; box-sizing: border-box;
         }
@@ -346,7 +351,7 @@ def get_components():
         .eq-mode-btn:hover { border-color: #ffffff; color: #ffffff; }
         .eq-voice-center { position: relative; z-index: 2; display: flex; justify-content: center; margin: 14px 0; }
         .eq-core-btn {
-          position: relative; width: 204px; height: 164px; background: rgba(14,14,17,0.9);
+          position: relative; width: 204px; height: 160px; background: rgba(14,14,17,0.9);
           border: 1px solid #2f2f36; color: #ffffff; display: flex; flex-direction: column;
           align-items: center; justify-content: center; gap: 8px; cursor: pointer; overflow: hidden;
           transition: border-color 220ms ease, background-color 220ms ease, transform 220ms ease;
@@ -364,7 +369,7 @@ def get_components():
         .eq-voice-shell.listening .brk { border-color: #080809; opacity: 1; }
         .sheen { position: absolute; inset: 0; background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%); transform: translateX(-120%); transition: transform 500ms ease; pointer-events: none; }
         .eq-core-btn:hover .sheen { transform: translateX(120%); }
-        .mic-svg { width: 90px; height: 90px; }
+        .mic-svg { width: 88px; height: 88px; }
         .ring-spin { transform-origin: 60px 60px; animation: spinSlow 16s linear infinite; }
         .eq-voice-shell.listening .ring-spin { animation: spinSlow 4s linear infinite; }
         .core-label { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.24em; }
@@ -434,7 +439,7 @@ def get_components():
           }
 
           if (!SR) {
-            statusText.textContent = "SIN MICROFONO";
+            statusText.textContent = "SIN MICRÓFONO";
             btnLabel.textContent = "NO DISPONIBLE";
             micBtn.disabled = true; micBtn.style.opacity = "0.45"; micBtn.style.cursor = "not-allowed";
           } else {
@@ -697,7 +702,7 @@ def get_components():
 
 
 # ==============================================================================
-# 3. CSS GLOBAL PURO (SIN ETIQUETAS HTML EN EL CUERPO)
+# 3. CSS GLOBAL PURO
 # ==============================================================================
 st.html(
     """<style>
@@ -720,26 +725,30 @@ html, body, [data-testid="stAppViewContainer"] {
   background-size: 100% 100%, 48px 48px, 48px 48px;
 }
 [data-testid="stHeader"] { background: transparent !important; height: 1.5rem !important; }
-.block-container { max-width: 900px !important; padding-top: 1.4rem !important; padding-bottom: 3rem !important; }
+.block-container { max-width: 920px !important; padding-top: 1.25rem !important; padding-bottom: 3rem !important; }
 h1, h2, h3 {
   font-family: 'Space Grotesk', sans-serif !important; font-weight: 400 !important;
   letter-spacing: 0.24em !important; text-transform: uppercase !important; color: #ffffff !important;
 }
-[data-testid="stPageLink-NavLink"] {
+[data-testid="stPageLink-NavLink"],
+[data-testid="stLinkButton"] a {
   border: 1px solid #26262b !important; border-radius: 0px !important;
-  background: #0f0f11 !important; color: #8a8a93 !important;
+  background: #0f0f11 !important; color: #b4b4bc !important;
   padding: 0.55rem 0.9rem !important; justify-content: center !important;
   transition: all 180ms ease !important;
 }
-[data-testid="stPageLink-NavLink"] p {
+[data-testid="stPageLink-NavLink"] p,
+[data-testid="stLinkButton"] a p {
   font-family: 'IBM Plex Mono', monospace !important; font-size: 0.76rem !important;
   letter-spacing: 0.22em !important; text-transform: uppercase !important; margin: 0 !important;
 }
-[data-testid="stPageLink-NavLink"]:hover {
+[data-testid="stPageLink-NavLink"]:hover,
+[data-testid="stLinkButton"] a:hover {
   border-color: #ffffff !important; background: #ffffff !important; color: #080809 !important;
   transform: translateY(-1px);
 }
-[data-testid="stPageLink-NavLink"]:hover p { color: #080809 !important; }
+[data-testid="stPageLink-NavLink"]:hover p,
+[data-testid="stLinkButton"] a:hover p { color: #080809 !important; }
 [data-testid="stFormSubmitButton"] > button, .stButton > button {
   border-radius: 0px !important; border: 1px solid #4a4a52 !important;
   background: #0f0f11 !important; color: #ffffff !important;
@@ -758,6 +767,11 @@ h1, h2, h3 {
   font-family: 'IBM Plex Mono', monospace !important; font-size: 0.76rem !important;
   letter-spacing: 0.08em !important; color: #8a8a93 !important;
 }
+iframe {
+  border: 1px solid #26262b !important;
+  background: #0b0b0d !important;
+}
+hr { border-color: #202025 !important; }
 </style>"""
 )
 
@@ -770,7 +784,7 @@ st.session_state["_eq"] = {
 
 
 # ==============================================================================
-# 4. VISTA PRINCIPAL Y ENRUTAMIENTO SIN BARRA LATERAL
+# 4. NAVEGACIÓN ENTRE LAS 3 APPS
 # ==============================================================================
 def render_inicio() -> None:
     st.session_state.pop("pulso_boot", None)
@@ -789,12 +803,70 @@ page_pulso = st.Page("pages/2_Control_MQTT.py", title="Pulso", url_path="pulso")
 
 current_page = st.navigation([page_inicio, page_voz, page_pulso], position="hidden")
 
+# Barra de navegación persistente visible en las 3 apps
 n1, n2, n3 = st.columns(3, gap="small")
 with n1:
-    st.page_link(page_inicio, label="[ INICIO ]" if current_page.title == "Inicio" else "INICIO", width="stretch")
+    st.page_link(
+        page_inicio,
+        label="[ INICIO ]" if current_page.title == "Inicio" else "INICIO",
+        width="stretch",
+    )
 with n2:
-    st.page_link(page_voz, label="[ VOZ ]" if current_page.title == "Voz" else "VOZ", width="stretch")
+    st.page_link(
+        page_voz,
+        label="[ VOZ ]" if current_page.title == "Voz" else "VOZ",
+        width="stretch",
+    )
 with n3:
-    st.page_link(page_pulso, label="[ PULSO ]" if current_page.title == "Pulso" else "PULSO", width="stretch")
+    st.page_link(
+        page_pulso,
+        label="[ PULSO ]" if current_page.title == "Pulso" else "PULSO",
+        width="stretch",
+    )
 
 current_page.run()
+
+
+# ==============================================================================
+# 5. MARCO INTEGRADO DE WOKWI (VISIBLE EN INICIO, VOZ Y PULSO)
+# ==============================================================================
+def _normalize_wokwi_url(raw: str) -> str:
+    txt = (raw or "").strip()
+    if not txt:
+        return ""
+    m = re.search(r"https?://(?:www\.)?wokwi\.com/projects/([0-9]+)", txt)
+    if m:
+        return f"https://wokwi.com/projects/{m.group(1)}"
+    if txt.isdigit():
+        return f"https://wokwi.com/projects/{txt}"
+    return ""
+
+
+if "wokwi_url" not in st.session_state:
+    st.session_state["wokwi_url"] = DEFAULT_WOKWI_URL
+
+st.divider()
+st.subheader("SIMULADOR")
+st.caption("Marco integrado de Wokwi compartido en Inicio, Voz y Pulso.")
+
+c_url, c_btn = st.columns([4, 1], vertical_alignment="bottom")
+with c_url:
+    entered_url = st.text_input(
+        "Proyecto Wokwi",
+        value=st.session_state["wokwi_url"],
+        placeholder="Pega tu enlace de Wokwi (ej. https://wokwi.com/projects/123456789012345678)",
+        label_visibility="collapsed",
+        key="wokwi_url_input",
+    )
+with c_btn:
+    show_sim = st.toggle("Ver", value=True, key="wokwi_visible")
+
+clean_url = _normalize_wokwi_url(entered_url)
+st.session_state["wokwi_url"] = clean_url if clean_url else entered_url.strip()
+
+if show_sim:
+    if clean_url:
+        components.iframe(clean_url, height=500, scrolling=True)
+        st.link_button("ABRIR EN PESTAÑA", clean_url)
+    else:
+        st.caption("● Pega arriba el enlace de tu proyecto guardado en wokwi.com para activar el marco.")
