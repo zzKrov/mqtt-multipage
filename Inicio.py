@@ -1,4 +1,3 @@
-import re
 import threading
 import time
 import uuid
@@ -8,7 +7,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 BASE_APP_URL = "https://mqtt-multipagez.streamlit.app"
-DEFAULT_WOKWI_URL = ""
+
+# Pega aquí el enlace permanente de tu proyecto guardado en Wokwi:
+WOKWI_URL = "https://wokwi.com/projects/new/esp32"
 
 st.set_page_config(
     page_title="CONTROL",
@@ -125,13 +126,14 @@ def get_components():
           grid-template-columns: repeat(3, 1fr);
           gap: 8px;
           width: 100%;
+          margin-top: 6px;
           margin-bottom: 6px;
         }
         .eq-link {
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 10px 12px;
+          padding: 11px 12px;
           border: 1px solid #26262b;
           background: #0f0f11;
           color: #8a8a93;
@@ -468,7 +470,6 @@ def get_components():
 
           const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-          // Motor persistente en window para sobrevivir reruns sin apagar el micrófono
           if (!window.__eqVoiceEngine) {
             window.__eqVoiceEngine = {
               wantListening: false,
@@ -639,7 +640,6 @@ def get_components():
             createAndStartRecognition();
           }
 
-          // Partículas 60 fps
           const ctx = canvas.getContext("2d");
           let width = 0, height = 0, rafId = 0;
           const motes = Array.from({ length: 42 }, (_, i) => ({
@@ -683,7 +683,6 @@ def get_components():
             cancelAnimationFrame(rafId);
             ro.disconnect();
             if (eng.uiSync === syncUI) eng.uiSync = null;
-            // Si el usuario sale a otra página (y no es un simple rerun en /voz), detiene el mic
             eng.stopTimer = setTimeout(() => {
               eng.wantListening = false;
               clearTimeout(eng.restartTimer);
@@ -900,7 +899,7 @@ def get_components():
 
 
 # ==============================================================================
-# 3. CSS GLOBAL PURO
+# 3. CSS GLOBAL PURO (CON MARGEN SUPERIOR PARA LIBRAR stAppToolbar)
 # ==============================================================================
 st.html(
     """<style>
@@ -908,7 +907,7 @@ st.html(
 
 [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"],
 [data-testid="collapsedControl"], [data-testid="stSidebarNav"],
-[data-testid="stDecoration"], #MainMenu, footer {
+[data-testid="stDecoration"], footer {
   display: none !important; width: 0 !important; visibility: hidden !important;
 }
 html, body, [data-testid="stAppViewContainer"] {
@@ -922,8 +921,21 @@ html, body, [data-testid="stAppViewContainer"] {
     linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
   background-size: 100% 100%, 48px 48px, 48px 48px;
 }
-[data-testid="stHeader"] { background: transparent !important; height: 1.2rem !important; }
-.block-container { max-width: 920px !important; padding-top: 1.2rem !important; padding-bottom: 3rem !important; }
+[data-testid="stHeader"] {
+  background: transparent !important;
+  pointer-events: none !important;
+}
+[data-testid="stToolbar"] {
+  pointer-events: none !important;
+}
+[data-testid="stToolbarActions"], [data-testid="stMainMenu"] {
+  pointer-events: auto !important;
+}
+.block-container {
+  max-width: 920px !important;
+  padding-top: 4.75rem !important;
+  padding-bottom: 3rem !important;
+}
 h1, h2, h3 {
   font-family: 'Space Grotesk', sans-serif !important; font-weight: 400 !important;
   letter-spacing: 0.24em !important; text-transform: uppercase !important; color: #ffffff !important;
@@ -1018,45 +1030,13 @@ current_page.run()
 
 
 # ==============================================================================
-# 5. MARCO INTEGRADO DE WOKWI (VISIBLE EN INICIO, VOZ Y PULSO)
+# 5. MARCO PERMANENTE DE WOKWI (SIN CAMPO DE TEXTO)
 # ==============================================================================
-def _normalize_wokwi_url(raw: str) -> str:
-    txt = (raw or "").strip()
-    if not txt:
-        return ""
-    m = re.search(r"https?://(?:www\.)?wokwi\.com/projects/([0-9]+)", txt)
-    if m:
-        return f"https://wokwi.com/projects/{m.group(1)}"
-    if txt.isdigit():
-        return f"https://wokwi.com/projects/{txt}"
-    return ""
-
-
-if "wokwi_url" not in st.session_state:
-    st.session_state["wokwi_url"] = DEFAULT_WOKWI_URL
-
 st.divider()
-st.subheader("SIMULADOR")
-st.caption("Marco integrado de Wokwi compartido en Inicio, Voz y Pulso.")
+c_title, c_link = st.columns([3, 1], vertical_alignment="center")
+with c_title:
+    st.subheader("SIMULADOR")
+with c_link:
+    st.link_button("ABRIR EN WOKWI", WOKWI_URL, width="stretch")
 
-c_url, c_btn = st.columns([4, 1], vertical_alignment="bottom")
-with c_url:
-    entered_url = st.text_input(
-        "Proyecto Wokwi",
-        value=st.session_state["wokwi_url"],
-        placeholder="Pega tu enlace de Wokwi (ej. https://wokwi.com/projects/123456789012345678)",
-        label_visibility="collapsed",
-        key="wokwi_url_input",
-    )
-with c_btn:
-    show_sim = st.toggle("Ver", value=True, key="wokwi_visible")
-
-clean_url = _normalize_wokwi_url(entered_url)
-st.session_state["wokwi_url"] = clean_url if clean_url else entered_url.strip()
-
-if show_sim:
-    if clean_url:
-        components.iframe(clean_url, height=500, scrolling=True)
-        st.link_button("ABRIR EN PESTAÑA", clean_url)
-    else:
-        st.caption("● Pega arriba el enlace de tu proyecto guardado en wokwi.com para activar el marco.")
+components.iframe(WOKWI_URL, height=520, scrolling=True)
