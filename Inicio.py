@@ -7,8 +7,8 @@ import paho.mqtt.client as mqtt
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Opcional: pega aquí el enlace de tu proyecto Wokwi para cargarlo por defecto
-DEFAULT_WOKWI_URL = "https://wokwi.com/projects/480798936029629441"
+BASE_APP_URL = "https://mqtt-multipagez.streamlit.app"
+DEFAULT_WOKWI_URL = ""
 
 st.set_page_config(
     page_title="CONTROL",
@@ -105,13 +105,77 @@ def get_mqtt_channel(host: str, port: int = 1883, prefix: str = "eq") -> MqttCha
 
 
 # ==============================================================================
-# 2. COMPONENTES VISUALES (SHADOW DOM + PARTÍCULAS + SVGS ANIMADOS)
+# 2. COMPONENTES (BARRA DE ENLACES + INICIO + VOZ CONTINUA + PULSO)
 # ==============================================================================
 @st.cache_resource(show_spinner=False)
 def get_components():
+    top_nav = st.components.v2.component(
+        "eq_top_nav",
+        html=f"""
+        <nav class="eq-nav">
+          <a class="eq-link" data-page="Inicio" href="{BASE_APP_URL}/" target="_top">INICIO</a>
+          <a class="eq-link" data-page="Voz" href="{BASE_APP_URL}/voz" target="_top">VOZ</a>
+          <a class="eq-link" data-page="Pulso" href="{BASE_APP_URL}/pulso" target="_top">PULSO</a>
+        </nav>
+        """,
+        css="""
+        :host { display: block; width: 100%; }
+        .eq-nav {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+          width: 100%;
+          margin-bottom: 6px;
+        }
+        .eq-link {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px 12px;
+          border: 1px solid #26262b;
+          background: #0f0f11;
+          color: #8a8a93;
+          text-decoration: none;
+          font-family: 'IBM Plex Mono', ui-monospace, monospace;
+          font-size: 12px;
+          letter-spacing: 0.22em;
+          transition: all 180ms ease;
+        }
+        .eq-link:hover {
+          border-color: #ffffff;
+          color: #ffffff;
+          background: #17171b;
+          transform: translateY(-1px);
+        }
+        .eq-link.active {
+          border-color: #ffffff;
+          background: #ffffff;
+          color: #080809;
+        }
+        """,
+        js="""
+        export default function(component) {
+          const { data, parentElement, setTriggerValue } = component;
+          const active = (data && data.active) || "Inicio";
+          const links = parentElement.querySelectorAll(".eq-link");
+          links.forEach((a) => {
+            const target = a.dataset.page;
+            a.classList.toggle("active", target === active);
+            a.onclick = (e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+              e.preventDefault();
+              if (target !== active) {
+                setTriggerValue("nav", { page: target, ts: Date.now() });
+              }
+            };
+          });
+        }
+        """,
+    )
+
     inicio_board = st.components.v2.component(
         "eq_inicio_board",
-        html="""
+        html=f"""
         <div class="wrap">
           <div class="hero">
             <canvas id="eq-canvas"></canvas>
@@ -130,7 +194,7 @@ def get_components():
           </div>
 
           <div class="cards">
-            <div class="card">
+            <a class="card" data-page="Voz" href="{BASE_APP_URL}/voz" target="_top">
               <div class="card-top">
                 <span class="idx">01</span>
                 <svg width="32" height="32" viewBox="0 0 34 34" fill="none">
@@ -141,10 +205,10 @@ def get_components():
                 </svg>
               </div>
               <div class="card-title">VOZ</div>
-              <div class="card-desc">Dictado directo.</div>
-            </div>
+              <div class="card-desc">Dictado continuo.</div>
+            </a>
 
-            <div class="card">
+            <a class="card" data-page="Pulso" href="{BASE_APP_URL}/pulso" target="_top">
               <div class="card-top">
                 <span class="idx">02</span>
                 <svg width="32" height="32" viewBox="0 0 34 34" fill="none">
@@ -156,7 +220,7 @@ def get_components():
               </div>
               <div class="card-title">PULSO</div>
               <div class="card-desc">Interruptor y nivel.</div>
-            </div>
+            </a>
           </div>
         </div>
         """,
@@ -184,10 +248,11 @@ def get_components():
         .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
         .card {
+          display: block; text-decoration: none;
           background: #0f0f11; border: 1px solid #26262b; padding: 16px 18px;
-          transition: border-color 180ms ease, background-color 180ms ease;
+          transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
         }
-        .card:hover { border-color: #4a4a52; background: #141417; }
+        .card:hover { border-color: #ffffff; background: #151519; transform: translateY(-2px); }
         .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
         .idx { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.24em; color: #8a8a93; }
         .card-title { font-size: 16px; letter-spacing: 0.22em; color: #ffffff; margin-bottom: 4px; }
@@ -207,10 +272,18 @@ def get_components():
         """,
         js="""
         export default function(component) {
-          const { parentElement } = component;
+          const { parentElement, setTriggerValue } = component;
           const wrap = parentElement.querySelector(".hero");
           const canvas = parentElement.querySelector("#eq-canvas");
           const coords = parentElement.querySelector("#eq-coords");
+          const cards = parentElement.querySelectorAll(".card");
+          cards.forEach((c) => {
+            c.onclick = (e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+              e.preventDefault();
+              setTriggerValue("nav", { page: c.dataset.page, ts: Date.now() });
+            };
+          });
           if (!wrap || !canvas) return;
           const ctx = canvas.getContext("2d");
           const mouse = { x: -999, y: -999, active: false };
@@ -290,7 +363,7 @@ def get_components():
                 <circle cx="24" cy="17" r="6" stroke="#ffffff" stroke-opacity="0.45" stroke-width="1"/>
                 <path d="M6 17H21M17 13L21 17L17 21" stroke="#ffffff" stroke-width="1.4" class="arr"/>
               </svg>
-              <div><span class="snum">03</span><span class="stxt">Envía</span></div>
+              <div><span class="snum">03</span><span class="stxt">Envío continuo</span></div>
             </div>
           </div>
 
@@ -298,7 +371,7 @@ def get_components():
             <canvas id="voice-canvas"></canvas>
             <div class="eq-voice-top">
               <div class="eq-status-tag"><span class="eq-led"></span><span id="status-text">LISTO</span></div>
-              <button type="button" class="eq-mode-btn" id="mode-btn">CONTINUO</button>
+              <button type="button" class="eq-mode-btn" id="mode-btn">MODO · EN VIVO</button>
             </div>
             <div class="eq-voice-center">
               <button type="button" class="eq-core-btn" id="mic-btn" aria-label="Activar micrófono">
@@ -383,7 +456,7 @@ def get_components():
         """,
         js="""
         export default function(component) {
-          const { data, parentElement, setTriggerValue } = component;
+          const { parentElement, setTriggerValue } = component;
           const shell = parentElement.querySelector("#shell");
           const canvas = parentElement.querySelector("#voice-canvas");
           const micBtn = parentElement.querySelector("#mic-btn");
@@ -393,19 +466,187 @@ def get_components():
           const transcriptView = parentElement.querySelector("#transcript-view");
           if (!shell || !canvas || !micBtn) return;
 
-          const ctx = canvas.getContext("2d");
-          const lang = (data && data.lang) || "es-CO";
           const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-          let width = 0, height = 0, rafId = 0, listening = false, continuousMode = true;
-          let manualStop = false, recognition = null, pulseEnergy = 0, seq = 0, unmounted = false;
 
+          // Motor persistente en window para sobrevivir reruns sin apagar el micrófono
+          if (!window.__eqVoiceEngine) {
+            window.__eqVoiceEngine = {
+              wantListening: false,
+              continuousMode: true,
+              isRunning: false,
+              recognition: null,
+              restartTimer: null,
+              stopTimer: null,
+              lastStatus: "LISTO",
+              lastTranscript: "—",
+              seq: 0,
+              pulseEnergy: 0,
+              ripples: [],
+              uiSync: null,
+              emitUtterance: null,
+            };
+          }
+          const eng = window.__eqVoiceEngine;
+
+          if (eng.stopTimer) {
+            clearTimeout(eng.stopTimer);
+            eng.stopTimer = null;
+          }
+
+          function syncUI() {
+            const active = eng.wantListening;
+            shell.classList.toggle("listening", active);
+            btnLabel.textContent = active ? "DETENER" : "ACTIVAR";
+            modeBtn.textContent = eng.continuousMode ? "MODO · EN VIVO" : "MODO · ÚNICO";
+            statusText.textContent = SR ? eng.lastStatus : "SIN MICRÓFONO";
+            transcriptView.textContent = eng.lastTranscript;
+          }
+
+          eng.uiSync = syncUI;
+          eng.emitUtterance = (text) => {
+            eng.seq += 1;
+            setTriggerValue("utterance", { text, id: `${Date.now()}-${eng.seq}` });
+          };
+
+          function spawnRipple(strong = false) {
+            eng.ripples.push({ r: 42, maxR: strong ? 190 : 140, alpha: strong ? 0.85 : 0.45 });
+          }
+
+          function createAndStartRecognition() {
+            if (!SR || !eng.wantListening || eng.isRunning) return;
+            if (eng.recognition) {
+              try { eng.recognition.onresult = null; eng.recognition.onend = null; eng.recognition.onerror = null; eng.recognition.abort(); } catch (_) {}
+              eng.recognition = null;
+            }
+            const rec = new SR();
+            rec.lang = "es-CO";
+            rec.interimResults = true;
+            rec.continuous = eng.continuousMode;
+            eng.recognition = rec;
+
+            rec.onstart = () => {
+              eng.isRunning = true;
+              eng.lastStatus = "ESCUCHANDO";
+              spawnRipple(false);
+              if (eng.uiSync) eng.uiSync();
+            };
+
+            rec.onresult = (e) => {
+              let interim = "";
+              let finalChunk = "";
+              for (let i = e.resultIndex; i < e.results.length; i++) {
+                const txt = e.results[i][0].transcript;
+                if (e.results[i].isFinal) finalChunk += txt + " ";
+                else interim += txt;
+              }
+              eng.pulseEnergy = 1.0;
+
+              if (interim.trim()) {
+                eng.lastTranscript = interim.trim() + " …";
+                if (eng.uiSync) eng.uiSync();
+              }
+
+              const clean = finalChunk.trim();
+              if (clean) {
+                eng.lastTranscript = clean;
+                eng.lastStatus = eng.continuousMode ? "ENVIADO · ESCUCHANDO" : "ENVIADO";
+                spawnRipple(true);
+                if (!eng.continuousMode) {
+                  eng.wantListening = false;
+                }
+                if (eng.uiSync) eng.uiSync();
+                if (eng.emitUtterance) eng.emitUtterance(clean);
+              }
+            };
+
+            rec.onerror = (e) => {
+              if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+                eng.wantListening = false;
+                eng.isRunning = false;
+                eng.lastStatus = "SIN PERMISO";
+                if (eng.uiSync) eng.uiSync();
+              } else if (e.error === "no-speech") {
+                eng.lastStatus = eng.wantListening ? "ESCUCHANDO" : "LISTO";
+                if (eng.uiSync) eng.uiSync();
+              } else if (e.error !== "aborted") {
+                eng.isRunning = false;
+              }
+            };
+
+            rec.onend = () => {
+              eng.isRunning = false;
+              if (eng.wantListening && eng.continuousMode) {
+                clearTimeout(eng.restartTimer);
+                eng.restartTimer = setTimeout(() => {
+                  createAndStartRecognition();
+                }, 120);
+              } else {
+                eng.wantListening = false;
+                if (eng.lastStatus === "ESCUCHANDO" || eng.lastStatus === "ENVIADO · ESCUCHANDO") {
+                  eng.lastStatus = "LISTO";
+                }
+                if (eng.uiSync) eng.uiSync();
+              }
+            };
+
+            try {
+              rec.start();
+            } catch (_) {
+              eng.isRunning = false;
+              clearTimeout(eng.restartTimer);
+              eng.restartTimer = setTimeout(() => createAndStartRecognition(), 250);
+            }
+          }
+
+          function stopRecognition() {
+            eng.wantListening = false;
+            clearTimeout(eng.restartTimer);
+            eng.lastStatus = "DETENIDO";
+            if (eng.recognition) {
+              try { eng.recognition.stop(); } catch (_) {}
+            }
+            eng.isRunning = false;
+            syncUI();
+          }
+
+          if (!SR) {
+            micBtn.disabled = true;
+            micBtn.style.opacity = "0.45";
+            micBtn.style.cursor = "not-allowed";
+          } else {
+            micBtn.onclick = () => {
+              if (eng.wantListening) {
+                stopRecognition();
+              } else {
+                eng.wantListening = true;
+                eng.lastStatus = "INICIANDO";
+                syncUI();
+                createAndStartRecognition();
+              }
+            };
+          }
+
+          modeBtn.onclick = () => {
+            eng.continuousMode = !eng.continuousMode;
+            syncUI();
+            if (eng.wantListening && eng.recognition) {
+              try { eng.recognition.stop(); } catch (_) {}
+            }
+          };
+
+          syncUI();
+          if (eng.wantListening && !eng.isRunning) {
+            createAndStartRecognition();
+          }
+
+          // Partículas 60 fps
+          const ctx = canvas.getContext("2d");
+          let width = 0, height = 0, rafId = 0;
           const motes = Array.from({ length: 42 }, (_, i) => ({
             angle: (Math.PI * 2 * i) / 42, radius: 58 + Math.random() * 88,
             speed: (0.002 + Math.random() * 0.004) * (i % 2 === 0 ? 1 : -1),
             size: 1 + Math.random() * 1.4, alpha: 0.18 + Math.random() * 0.45
           }));
-          const ripples = [];
-          function spawnRipple(strong = false) { ripples.push({ r: 42, maxR: strong ? 190 : 140, alpha: strong ? 0.85 : 0.45 }); }
 
           function resize() {
             const rect = shell.getBoundingClientRect();
@@ -414,86 +655,43 @@ def get_components():
             canvas.width = Math.floor(width * dpr); canvas.height = Math.floor(height * dpr);
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           }
+
           function draw() {
             ctx.clearRect(0, 0, width, height);
             const cx = width / 2, cy = height / 2 - 4;
-            pulseEnergy *= 0.92;
-            for (let i = ripples.length - 1; i >= 0; i--) {
-              const rp = ripples[i]; rp.r += 2.6; rp.alpha *= 0.95;
+            eng.pulseEnergy *= 0.92;
+            const active = eng.wantListening;
+            for (let i = eng.ripples.length - 1; i >= 0; i--) {
+              const rp = eng.ripples[i]; rp.r += 2.6; rp.alpha *= 0.95;
               ctx.strokeStyle = `rgba(255,255,255,${rp.alpha})`; ctx.lineWidth = 1;
               ctx.beginPath(); ctx.arc(cx, cy, rp.r, 0, Math.PI * 2); ctx.stroke();
-              if (rp.r > rp.maxR || rp.alpha < 0.02) ripples.splice(i, 1);
+              if (rp.r > rp.maxR || rp.alpha < 0.02) eng.ripples.splice(i, 1);
             }
             for (const m of motes) {
-              m.angle += m.speed * (listening ? 2.4 + pulseEnergy * 3.0 : 1);
-              const r = m.radius + (listening ? Math.sin(m.angle * 3 + pulseEnergy) * (6 + pulseEnergy * 18) : 0);
-              ctx.fillStyle = `rgba(255,255,255,${listening ? Math.min(0.95, m.alpha + 0.25) : m.alpha})`;
+              m.angle += m.speed * (active ? 2.4 + eng.pulseEnergy * 3.0 : 1);
+              const r = m.radius + (active ? Math.sin(m.angle * 3 + eng.pulseEnergy) * (6 + eng.pulseEnergy * 18) : 0);
+              ctx.fillStyle = `rgba(255,255,255,${active ? Math.min(0.95, m.alpha + 0.25) : m.alpha})`;
               ctx.fillRect(cx + Math.cos(m.angle) * r, cy + Math.sin(m.angle) * (r * 0.72), m.size, m.size);
             }
             rafId = requestAnimationFrame(draw);
           }
-          function setUIListening(active, msg) {
-            listening = active; shell.classList.toggle("listening", active);
-            btnLabel.textContent = active ? "DETENER" : "ACTIVAR";
-            if (msg) statusText.textContent = msg;
-          }
-
-          if (!SR) {
-            statusText.textContent = "SIN MICRÓFONO";
-            btnLabel.textContent = "NO DISPONIBLE";
-            micBtn.disabled = true; micBtn.style.opacity = "0.45"; micBtn.style.cursor = "not-allowed";
-          } else {
-            recognition = new SR();
-            recognition.lang = lang; recognition.interimResults = true; recognition.continuous = continuousMode;
-            recognition.onstart = () => { if (!unmounted) { setUIListening(true, "ESCUCHANDO"); spawnRipple(false); } };
-            recognition.onresult = (e) => {
-              if (unmounted) return;
-              let interim = "", finalChunk = "";
-              for (let i = e.resultIndex; i < e.results.length; i++) {
-                const txt = e.results[i][0].transcript;
-                if (e.results[i].isFinal) finalChunk += txt; else interim += txt;
-              }
-              pulseEnergy = 1.0;
-              if (interim.trim()) transcriptView.textContent = interim.trim() + " …";
-              const clean = finalChunk.trim();
-              if (clean) {
-                transcriptView.textContent = clean; statusText.textContent = "ENVIADO"; spawnRipple(true);
-                seq += 1; setTriggerValue("utterance", { text: clean, id: `${Date.now()}-${seq}` });
-              }
-            };
-            recognition.onerror = (e) => {
-              if (unmounted) return;
-              if (e.error === "not-allowed" || e.error === "service-not-allowed") { manualStop = true; setUIListening(false, "SIN PERMISO"); }
-              else if (e.error === "no-speech") statusText.textContent = listening ? "SIN SEÑAL" : "LISTO";
-              else if (e.error !== "aborted") setUIListening(false, "PAUSADO");
-            };
-            recognition.onend = () => {
-              if (unmounted) return;
-              if (!manualStop && continuousMode && listening) {
-                setTimeout(() => {
-                  if (!unmounted && !manualStop && listening) {
-                    try { recognition.continuous = continuousMode; recognition.start(); }
-                    catch (_) { setUIListening(false, "LISTO"); }
-                  }
-                }, 160);
-              } else setUIListening(false, "LISTO");
-            };
-            micBtn.onclick = () => {
-              if (listening) { manualStop = true; try { recognition.stop(); } catch (_) {} setUIListening(false, "DETENIDO"); }
-              else { manualStop = false; recognition.continuous = continuousMode; try { recognition.start(); } catch (_) { setUIListening(false, "REINTENTA"); } }
-            };
-          }
-          modeBtn.onclick = () => {
-            continuousMode = !continuousMode;
-            modeBtn.textContent = continuousMode ? "CONTINUO" : "ÚNICO";
-            if (recognition) recognition.continuous = continuousMode;
-          };
 
           const ro = new ResizeObserver(resize); ro.observe(shell); resize();
           rafId = requestAnimationFrame(draw);
+
           return () => {
-            unmounted = true; manualStop = true; cancelAnimationFrame(rafId); ro.disconnect();
-            if (recognition) { try { recognition.abort(); } catch (_) {} }
+            cancelAnimationFrame(rafId);
+            ro.disconnect();
+            if (eng.uiSync === syncUI) eng.uiSync = null;
+            // Si el usuario sale a otra página (y no es un simple rerun en /voz), detiene el mic
+            eng.stopTimer = setTimeout(() => {
+              eng.wantListening = false;
+              clearTimeout(eng.restartTimer);
+              if (eng.recognition) {
+                try { eng.recognition.abort(); } catch (_) {}
+              }
+              eng.isRunning = false;
+            }, 600);
           };
         }
         """,
@@ -698,7 +896,7 @@ def get_components():
         """,
     )
 
-    return inicio_board, voice_console, pulse_console
+    return top_nav, inicio_board, voice_console, pulse_console
 
 
 # ==============================================================================
@@ -724,30 +922,25 @@ html, body, [data-testid="stAppViewContainer"] {
     linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
   background-size: 100% 100%, 48px 48px, 48px 48px;
 }
-[data-testid="stHeader"] { background: transparent !important; height: 1.5rem !important; }
-.block-container { max-width: 920px !important; padding-top: 1.25rem !important; padding-bottom: 3rem !important; }
+[data-testid="stHeader"] { background: transparent !important; height: 1.2rem !important; }
+.block-container { max-width: 920px !important; padding-top: 1.2rem !important; padding-bottom: 3rem !important; }
 h1, h2, h3 {
   font-family: 'Space Grotesk', sans-serif !important; font-weight: 400 !important;
   letter-spacing: 0.24em !important; text-transform: uppercase !important; color: #ffffff !important;
 }
-[data-testid="stPageLink-NavLink"],
 [data-testid="stLinkButton"] a {
   border: 1px solid #26262b !important; border-radius: 0px !important;
   background: #0f0f11 !important; color: #b4b4bc !important;
   padding: 0.55rem 0.9rem !important; justify-content: center !important;
   transition: all 180ms ease !important;
 }
-[data-testid="stPageLink-NavLink"] p,
 [data-testid="stLinkButton"] a p {
   font-family: 'IBM Plex Mono', monospace !important; font-size: 0.76rem !important;
   letter-spacing: 0.22em !important; text-transform: uppercase !important; margin: 0 !important;
 }
-[data-testid="stPageLink-NavLink"]:hover,
 [data-testid="stLinkButton"] a:hover {
   border-color: #ffffff !important; background: #ffffff !important; color: #080809 !important;
-  transform: translateY(-1px);
 }
-[data-testid="stPageLink-NavLink"]:hover p,
 [data-testid="stLinkButton"] a:hover p { color: #080809 !important; }
 [data-testid="stFormSubmitButton"] > button, .stButton > button {
   border-radius: 0px !important; border: 1px solid #4a4a52 !important;
@@ -775,7 +968,7 @@ hr { border-color: #202025 !important; }
 </style>"""
 )
 
-inicio_board, voice_console, pulse_console = get_components()
+top_nav, inicio_board, voice_console, pulse_console = get_components()
 st.session_state["_eq"] = {
     "get_channel": get_mqtt_channel,
     "voice_console": voice_console,
@@ -784,45 +977,42 @@ st.session_state["_eq"] = {
 
 
 # ==============================================================================
-# 4. NAVEGACIÓN ENTRE LAS 3 APPS
+# 4. NAVEGACIÓN ENTRE LAS 3 APPS (RAÍZ /, /voz, /pulso)
 # ==============================================================================
+def _handle_nav(nav_payload: dict | None, current_title: str) -> None:
+    if not nav_payload:
+        return
+    ts = nav_payload.get("ts")
+    if ts and ts != st.session_state.get("_last_nav_ts"):
+        st.session_state["_last_nav_ts"] = ts
+        target = nav_payload.get("page")
+        if target == "Inicio" and current_title != "Inicio":
+            st.switch_page(page_inicio)
+        elif target == "Voz" and current_title != "Voz":
+            st.switch_page(page_voz)
+        elif target == "Pulso" and current_title != "Pulso":
+            st.switch_page(page_pulso)
+
+
 def render_inicio() -> None:
     st.session_state.pop("pulso_boot", None)
     st.subheader("CONTROL")
-    inicio_board(key="eq_inicio_board")
-    c1, c2 = st.columns(2, gap="medium")
-    with c1:
-        st.page_link(page_voz, label="VOZ", width="stretch")
-    with c2:
-        st.page_link(page_pulso, label="PULSO", width="stretch")
+    board_res = inicio_board(key="eq_inicio_board", on_nav_change=lambda: None)
+    _handle_nav(getattr(board_res, "nav", None), "Inicio")
 
 
-page_inicio = st.Page(render_inicio, title="Inicio", url_path="inicio", default=True)
+page_inicio = st.Page(render_inicio, title="Inicio", default=True)
 page_voz = st.Page("pages/1_Control_por_voz.py", title="Voz", url_path="voz")
 page_pulso = st.Page("pages/2_Control_MQTT.py", title="Pulso", url_path="pulso")
 
 current_page = st.navigation([page_inicio, page_voz, page_pulso], position="hidden")
 
-# Barra de navegación persistente visible en las 3 apps
-n1, n2, n3 = st.columns(3, gap="small")
-with n1:
-    st.page_link(
-        page_inicio,
-        label="[ INICIO ]" if current_page.title == "Inicio" else "INICIO",
-        width="stretch",
-    )
-with n2:
-    st.page_link(
-        page_voz,
-        label="[ VOZ ]" if current_page.title == "Voz" else "VOZ",
-        width="stretch",
-    )
-with n3:
-    st.page_link(
-        page_pulso,
-        label="[ PULSO ]" if current_page.title == "Pulso" else "PULSO",
-        width="stretch",
-    )
+nav_res = top_nav(
+    key="eq_top_nav",
+    data={"active": current_page.title},
+    on_nav_change=lambda: None,
+)
+_handle_nav(getattr(nav_res, "nav", None), current_page.title)
 
 current_page.run()
 
