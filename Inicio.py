@@ -8,7 +8,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # Opcional: pega aquí el enlace de tu proyecto Wokwi para cargarlo por defecto
-DEFAULT_WOKWI_URL = ""
+DEFAULT_WOKWI_URL = "https://wokwi.com/projects/480798936029629441"
 
 st.set_page_config(
     page_title="CONTROL",
