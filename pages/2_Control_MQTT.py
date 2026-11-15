@@ -23,36 +23,42 @@ if "pulso_boot" not in st.session_state:
 st.subheader("PULSO")
 st.caption("Estado binario y nivel.")
 
-res = eq["pulse_console"](
-    key="eq_pulse_widget",
-    data=st.session_state["pulso_boot"],
-    on_command_change=lambda: None,
-)
 
-if getattr(res, "command", None):
-    cmd = res.command
-    cid = cmd.get("id")
-    if cid and cid != st.session_state.get("last_pulse_cmd_id"):
-        kind = cmd.get("kind")
-        val = cmd.get("value")
-        hora = datetime.now().strftime("%H:%M:%S")
+@st.fragment
+def _pulse_panel() -> None:
+    res = eq["pulse_console"](
+        key="eq_pulse_widget",
+        data=st.session_state["pulso_boot"],
+        on_command_change=lambda: None,
+    )
 
-        if kind == "switch" and val in ("ON", "OFF"):
-            st.session_state["pulse_switch"] = val
-            ok, ms = channel.publish(TOPIC_SWITCH, json.dumps({"Act1": val}))
-            etiqueta = "Encendido" if val == "ON" else "Apagado"
-            st.session_state["last_pulse_status"] = (
-                f"{hora} · {etiqueta} · {ms:.0f} ms" if ok else f"{hora} · Sin respuesta"
-            )
+    if getattr(res, "command", None):
+        cmd = res.command
+        cid = cmd.get("id")
+        if cid and cid != st.session_state.get("last_pulse_cmd_id"):
+            kind = cmd.get("kind")
+            val = cmd.get("value")
+            hora = datetime.now().strftime("%H:%M:%S")
 
-        elif kind == "analog":
-            num = float(val)
-            st.session_state["pulse_analog"] = num
-            ok, ms = channel.publish(TOPIC_ANALOG, json.dumps({"Analog": num}))
-            st.session_state["last_pulse_status"] = (
-                f"{hora} · Nivel {num:.1f} · {ms:.0f} ms" if ok else f"{hora} · Sin respuesta"
-            )
+            if kind == "switch" and val in ("ON", "OFF"):
+                st.session_state["pulse_switch"] = val
+                ok, ms = channel.publish(TOPIC_SWITCH, json.dumps({"Act1": val}))
+                etiqueta = "Encendido" if val == "ON" else "Apagado"
+                st.session_state["last_pulse_status"] = (
+                    f"{hora} · {etiqueta} · {ms:.0f} ms" if ok else f"{hora} · Sin respuesta"
+                )
 
-        st.session_state["last_pulse_cmd_id"] = cid
+            elif kind == "analog":
+                num = float(val)
+                st.session_state["pulse_analog"] = num
+                ok, ms = channel.publish(TOPIC_ANALOG, json.dumps({"Analog": num}))
+                st.session_state["last_pulse_status"] = (
+                    f"{hora} · Nivel {num:.1f} · {ms:.0f} ms" if ok else f"{hora} · Sin respuesta"
+                )
 
-st.caption(f"● {st.session_state.get('last_pulse_status', 'Listo.')}")
+            st.session_state["last_pulse_cmd_id"] = cid
+
+    st.caption(f"● {st.session_state.get('last_pulse_status', 'Listo.')}")
+
+
+_pulse_panel()
