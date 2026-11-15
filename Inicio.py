@@ -9,7 +9,7 @@ import streamlit.components.v1 as components
 BASE_APP_URL = "https://mqtt-multipagez.streamlit.app"
 
 # Pega aquí el enlace permanente de tu proyecto guardado en Wokwi:
-WOKWI_URL = "https://wokwi.com/projects/new/esp32"
+WOKWI_URL = "https://wokwi.com/projects/480798936029629441"
 
 st.set_page_config(
     page_title="CONTROL",
